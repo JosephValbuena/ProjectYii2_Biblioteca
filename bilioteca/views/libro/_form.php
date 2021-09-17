@@ -14,7 +14,11 @@ use yii\widgets\ActiveForm;
 
     <?= $form->field($model, 'titulo')->textInput(['maxlength' => true]) ?>
 
-    <?= $form->field($model, 'imagen')->textInput(['maxlength' => true]) ?>
+    <?= Html::img($model->imagen, ['width' => '120px']); ?>
+    
+    <br><br>
+
+    <?= $form->field($model, 'archivo')->fileInput() ?>
 
     <div class="form-group">
         <?= Html::submitButton('Save', ['class' => 'btn btn-success']) ?>

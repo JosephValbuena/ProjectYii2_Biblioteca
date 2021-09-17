@@ -1,12 +1,17 @@
 <?php
 
-namespace app\Controllers;
+namespace app\controllers;
 
+use Yii;
+use yii\filters\AccessController;
+use yii\filters\AccessControl;
 use app\models\Libro;
 use app\models\LibroSearch;
 use yii\web\Controller;
 use yii\web\NotFoundHttpException;
 use yii\filters\VerbFilter;
+use yii\web\UploadedFile;
+use yii\data\Pagination;
 
 /**
  * LibroController implements the CRUD actions for Libro model.
@@ -21,6 +26,16 @@ class LibroController extends Controller
         return array_merge(
             parent::behaviors(),
             [
+                'access'=>[
+                    'class'=>AccessControl::className(),
+                    'only'=>['index','view','create','update','delete','_search','_form'],
+                    'rules'=>[
+                        [
+                            'allow'=>true,
+                            'roles'=>['@']
+                        ]
+                    ],
+                ],
                 'verbs' => [
                     'class' => VerbFilter::className(),
                     'actions' => [
@@ -68,13 +83,9 @@ class LibroController extends Controller
     {
         $model = new Libro();
 
-        if ($this->request->isPost) {
-            if ($model->load($this->request->post()) && $model->save()) {
-                return $this->redirect(['view', 'id' => $model->id]);
-            }
-        } else {
-            $model->loadDefaultValues();
-        }
+        $this->subirFoto($model);
+
+        
 
         return $this->render('create', [
             'model' => $model,
@@ -92,9 +103,7 @@ class LibroController extends Controller
     {
         $model = $this->findModel($id);
 
-        if ($this->request->isPost && $model->load($this->request->post()) && $model->save()) {
-            return $this->redirect(['view', 'id' => $model->id]);
-        }
+        $this->subirFoto($model);
 
         return $this->render('update', [
             'model' => $model,
@@ -110,9 +119,28 @@ class LibroController extends Controller
      */
     public function actionDelete($id)
     {
-        $this->findModel($id)->delete();
+        $model = $this->findModel($id);
+        
+        if(file_exists($model->imagen)){
+            unlink($model->imagen);
+        }
+        
+        $model->delete();
 
         return $this->redirect(['index']);
+    }
+
+    public function actionLista(){
+        $model= Libro::find();
+
+        $pagination = new Pagination([
+            'defaultPageSize'=>4,
+            'totalCount'=> $model->count(),
+        ]);
+
+        $libros = $model->orderBy('titulo')->offset($pagination->offset)->limit($pagination->limit)->all();
+
+        return $this->render('lista', ['libros'=>$libros, 'pagination'=>$pagination]);
     }
 
     /**
@@ -129,5 +157,39 @@ class LibroController extends Controller
         }
 
         throw new NotFoundHttpException('The requested page does not exist.');
+    }
+
+
+
+    protected function subirFoto(Libro $model){
+        if ($this->request->isPost) {
+            if ($model->load($this->request->post())) {
+
+                $model->archivo= UploadedFile::getInstance($model, 'archivo');
+
+                if($model->validate()) {
+
+                    if($model->archivo){
+
+                        if(file_exists($model->imagen)){
+                            unlink($model->imagen);
+                        }
+                        
+                        $rutaArchivo = 'uploads/'.time()."_".$model->archivo->baseName.".".$model->archivo->extension;
+
+                        if($model->archivo->saveAs($rutaArchivo)){
+                            $model->imagen=$rutaArchivo;
+                        }
+                    }
+
+                }
+
+                if($model->save(false)){                    
+                    return $this->redirect(['index']);
+                }
+            }
+        } else {
+            $model->loadDefaultValues();
+        }
     }
 }
